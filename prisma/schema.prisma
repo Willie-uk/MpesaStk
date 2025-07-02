@@ -21,8 +21,7 @@ enum TransactionStatus {
 }
 
 model Transaction {
-  id String @id @default(cuid())
-  CheckoutRequestID String
+   CheckoutRequestID String @id
   amount Float
   status TransactionStatus @default(PENDING)
   createdAt DateTime @default(now())

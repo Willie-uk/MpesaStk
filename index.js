@@ -14,7 +14,7 @@ app.post("/initiate", async (req, res) => {
   try {
     const { phoneNumber, amount, productName } = req.body;
     const accessToken = await getAccessToken();
-    const initiateStk = await stkPush(
+    const initiateStkResponse = await stkPush(
       accessToken,
       phoneNumber,
       amount,
@@ -24,7 +24,7 @@ app.post("/initiate", async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Access token fetched successfully",
-      initiateStk,
+      initiateStkResponse,
     });
   } catch (error) {
     console.log("Error initiating STK push", error);
@@ -37,24 +37,25 @@ app.post("/initiate", async (req, res) => {
 
 app.post("/callback", async (req, res) => {
   try {
-    const stkCallbackData = req.body.Body;
+    const { stkCallback } = req.body.Body;
     let status = null;
-    if (stkCallbackData.Result === "0") {
+    if (stkCallback.Result === "0") {
       status = "Success";
     } else {
       status: "Failed";
     }
-    await prisma.transaction.update({
+    const dbdata = await prisma.transaction.update({
       where: {
-        CheckoutRequestID: stkCallbackData.CheckoutRequestID,
+        CheckoutRequestID: stkCallback.CheckoutRequestID,
       },
       data: {
         status: status,
-        responseCode: stkCallbackData.ResultCode,
-        responseDescription: stkCallbackData.ResultDesc,
       },
     });
-    res.json({ status, stkCallbackData });
+
+    console.log(dbdata);
+
+    res.json({ status, stkCallback });
   } catch (error) {
     res.status(500).json({
       success: false,
