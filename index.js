@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { getAccessToken } from "./lib/auth.js";
 import { stkPush } from "./lib/stkPush.js";
+import prisma from "./lib/db.js";
 
 dotenv.config();
 const app = express();
@@ -19,6 +20,24 @@ app.post("/initiate", async (req, res) => {
       amount,
       productName
     );
+    prisma.transaction.create({
+      data: {
+        phoneNumber,
+        amount,
+        productName,
+        CheckoutRequestID: initiateStk.CheckoutRequestID,
+        status: "Pending",
+      },
+    });
+    prisma.transaction.create({
+      data: {
+        phoneNumber,
+        amount,
+        productName,
+        transactionId: initiateStk.CheckoutRequestID,
+        status: "Pending",
+      },
+    });
     res.status(200).json({
       success: true,
       message: "Access token fetched successfully",
@@ -35,14 +54,24 @@ app.post("/initiate", async (req, res) => {
 
 app.post("/callback", async (req, res) => {
   try {
-    const callbackData = req.body.Body;
+    const stkCallbackData = req.body.Body;
     let status = null;
-    if (callbackData.Result === "0") {
+    if (stkCallbackData.Result === "0") {
       status = "Success";
     } else {
       status: "Failed";
     }
-    res.json({ status, callbackData });
+    prisma.transaction.update({
+      where: {
+        CheckoutRequestID: stkCallbackData.CheckoutRequestID,
+      },
+      data: {
+        status: status,
+        responseCode: stkCallbackData.ResultCode,
+        responseDescription: stkCallbackData.ResultDesc,
+      },
+    });
+    res.json({ status, stkCallbackData });
   } catch (error) {
     res.status(500).json({
       success: false,
