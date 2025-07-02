@@ -20,24 +20,7 @@ app.post("/initiate", async (req, res) => {
       amount,
       productName
     );
-    prisma.transaction.create({
-      data: {
-        phoneNumber,
-        amount,
-        productName,
-        CheckoutRequestID: initiateStk.CheckoutRequestID,
-        status: "Pending",
-      },
-    });
-    prisma.transaction.create({
-      data: {
-        phoneNumber,
-        amount,
-        productName,
-        transactionId: initiateStk.CheckoutRequestID,
-        status: "Pending",
-      },
-    });
+
     res.status(200).json({
       success: true,
       message: "Access token fetched successfully",
@@ -61,7 +44,7 @@ app.post("/callback", async (req, res) => {
     } else {
       status: "Failed";
     }
-    prisma.transaction.update({
+    await prisma.transaction.update({
       where: {
         CheckoutRequestID: stkCallbackData.CheckoutRequestID,
       },
