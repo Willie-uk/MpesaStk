@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import bodyParser from "body-parser";
 import connectDB from "./lib/db.js";
 import { getAccessToken } from "./lib/auth.js";
 import { stkPush } from "./lib/stkPush.js";
@@ -9,6 +10,7 @@ import Transaction from "./model/Transaction.js";
 dotenv.config();
 const app = express();
 app.use(express.json());
+app.use(bodyParser.json());
 app.use(cors());
 
 connectDB();
@@ -40,9 +42,15 @@ app.post("/initiate", async (req, res) => {
 
 // ✅ Callback URL for Safaricom to send final status
 app.post("/callback", async (req, res) => {
+  console.log("📥 Raw Callback Body:", JSON.stringify(req.body, null, 2));
   try {
+    if (!req.body?.Body?.stkCallback) {
+      console.error("❌ Missing stkCallback in body:", req.body);
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid callback structure" });
+    }
     const { stkCallback } = req.body.Body;
-
     const {
       MerchantRequestID,
       CheckoutRequestID,
