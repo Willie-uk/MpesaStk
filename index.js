@@ -40,60 +40,41 @@ app.post("/initiate", async (req, res) => {
   }
 });
 
-// ✅ Callback URL for Safaricom to send final status
+// ✅ Callback endpoint using Mongoose
 app.post("/callback", async (req, res) => {
-  console.log("📥 Raw Callback Body:", JSON.stringify(req.body, null, 2));
   try {
-    if (!req.body?.Body?.stkCallback) {
-      console.error("❌ Missing stkCallback in body:", req.body);
+    const { stkCallback } = req.body.Body;
+
+    if (!stkCallback) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid callback structure" });
     }
-    const { stkCallback } = req.body.Body;
-    const {
-      MerchantRequestID,
-      CheckoutRequestID,
-      ResultCode,
-      ResultDesc,
-      CallbackMetadata,
-    } = stkCallback;
 
-    const status = ResultCode === 0 ? "SUCCESS" : "FAILED";
+    console.log("📦 Received Callback:", JSON.stringify(stkCallback, null, 2));
 
-    // Extract values safely
-    const amount =
-      CallbackMetadata?.Item.find((i) => i.Name === "Amount")?.Value || 0;
-    const receiptNumber =
-      CallbackMetadata?.Item.find((i) => i.Name === "MpesaReceiptNumber")
-        ?.Value || "";
-    const transactionDate =
-      CallbackMetadata?.Item.find((i) => i.Name === "TransactionDate")?.Value ||
-      "";
-    const phoneNumber =
-      CallbackMetadata?.Item.find((i) => i.Name === "PhoneNumber")?.Value || "";
+    const status = stkCallback.ResultCode === 0 ? "SUCCESS" : "FAILED";
 
-    // Update existing transaction
     const updated = await Transaction.findOneAndUpdate(
-      { CheckoutRequestID },
-      {
-        status,
-        amount,
-        receiptNumber,
-        transactionDate,
-        phoneNumber,
-      },
+      { CheckoutRequestID: stkCallback.CheckoutRequestID },
+      { status },
       { new: true }
     );
 
-    console.log("✅ Callback processed and transaction updated:", updated);
+    if (!updated) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Transaction not found" });
+    }
 
-    res.status(200).json({ success: true, updated });
+    console.log("✅ Transaction status updated:", updated);
+
+    res.json({ success: true, status, updated });
   } catch (error) {
-    console.error("❌ Error handling callback:", error);
+    console.error("❌ Error updating transaction:", error);
     res
       .status(500)
-      .json({ success: false, message: "Callback handling failed", error });
+      .json({ success: false, message: "Something went wrong", error });
   }
 });
 
