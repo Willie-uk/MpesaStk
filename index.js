@@ -40,41 +40,43 @@ app.post("/initiate", async (req, res) => {
   }
 });
 
-// ✅ Callback endpoint using Mongoose
+// ✅ Callback URL for Safaricom to send final status
 app.post("/callback", async (req, res) => {
   try {
     const { stkCallback } = req.body.Body;
 
-    if (!stkCallback) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid callback structure" });
-    }
+    const {
+      CheckoutRequestID,
+      MerchantRequestID,
+      ResultCode,
+      ResultDesc,
+      CallbackMetadata,
+    } = stkCallback;
 
-    console.log("📦 Received Callback:", JSON.stringify(stkCallback, null, 2));
+    const status = ResultCode === 0 ? "SUCCESS" : "FAILED";
 
-    const status = stkCallback.ResultCode === 0 ? "SUCCESS" : "FAILED";
-
-    const updated = await Transaction.findOneAndUpdate(
-      { CheckoutRequestID: stkCallback.CheckoutRequestID },
-      { status },
+    const transaction = await Transaction.findOneAndUpdate(
+      { CheckoutRequestID },
+      {
+        status,
+        receiptNumber:
+          CallbackMetadata?.Item.find((i) => i.Name === "MpesaReceiptNumber")
+            ?.Value || "",
+        transactionDate:
+          CallbackMetadata?.Item.find((i) => i.Name === "TransactionDate")
+            ?.Value || "",
+      },
       { new: true }
     );
 
-    if (!updated) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Transaction not found" });
-    }
+    console.log("Updated transaction:", transaction);
 
-    console.log("✅ Transaction status updated:", updated);
-
-    res.json({ success: true, status, updated });
+    res.json({ success: true, status });
   } catch (error) {
-    console.error("❌ Error updating transaction:", error);
+    console.error("Callback error:", error);
     res
       .status(500)
-      .json({ success: false, message: "Something went wrong", error });
+      .json({ success: false, message: "Callback handling failed" });
   }
 });
 
